@@ -67,6 +67,7 @@ final class ChatIntroItemComponent: Component {
         private var emptyNode: ChatEmptyNode?
         
         var customUpdateIsHighlighted: ((Bool) -> Void)?
+        var enumerateSiblings: (((UIView) -> Void) -> Void)?
         private(set) var separatorInset: CGFloat = 0.0
         
         override init(frame: CGRect) {
@@ -110,6 +111,7 @@ final class ChatIntroItemComponent: Component {
             let interfaceState = ChatPresentationInterfaceState(
                 chatWallpaper: presentationData.chatWallpaper,
                 theme: component.theme,
+                preferredGlassType: .default,
                 strings: component.strings,
                 dateTimeFormat: presentationData.dateTimeFormat,
                 nameDisplayOrder: presentationData.nameDisplayOrder,
@@ -125,7 +127,6 @@ final class ChatIntroItemComponent: Component {
                 pendingUnpinnedAllMessages: false,
                 activeGroupCallInfo: nil,
                 hasActiveGroupCall: false,
-                importState: nil,
                 threadData: nil,
                 isGeneralThreadClosed: nil,
                 replyMessage: nil,

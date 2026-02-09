@@ -19,6 +19,8 @@ import TelegramStringFormatting
 import GlassBarButtonComponent
 import GiftItemComponent
 import EdgeEffect
+import TableComponent
+import PeerTableCellComponent
 
 private final class GiftAuctionAcquiredScreenComponent: Component {
     typealias EnvironmentType = ViewControllerComponentContainer.Environment
@@ -328,11 +330,21 @@ private final class GiftAuctionAcquiredScreenComponent: Component {
                 
                 
                 var giftSubject: GiftItemComponent.Subject?
+                var giftTitle: String = ""
                 if case let .generic(gift) = component.gift {
                     giftSubject = .starGift(gift: gift, price: "")
+                    giftTitle = gift.title ?? ""
                 }
                 
                 if let giftSubject {
+                    let titleString: String
+                    if let number = gift.number {
+                        let fullGiftTitle = "\(giftTitle) #\(formatCollectibleNumber(number, dateTimeFormat: environment.dateTimeFormat))"
+                        titleString = environment.strings.Gift_Acquired_GiftRound(fullGiftTitle, "\(gift.round)").string
+                    } else {
+                        titleString = environment.strings.Gift_Acquired_Round("\(gift.round)").string
+                    }
+                    
                     items.append(.init(
                         id: "header",
                         title: nil,
@@ -351,7 +363,7 @@ private final class GiftAuctionAcquiredScreenComponent: Component {
                             AnyComponentWithIdentity(
                                 id: "title",
                                 component: AnyComponent(
-                                    MultilineTextComponent(text: .plain(NSAttributedString(string: environment.strings.Gift_Acquired_Round("\(gift.round)").string, font: tableBoldFont, textColor: tableTextColor)))
+                                    MultilineTextComponent(text: .plain(NSAttributedString(string: titleString, font: tableBoldFont, textColor: tableTextColor)))
                                 )
                             )
                         ], spacing: 1.0))
@@ -363,7 +375,7 @@ private final class GiftAuctionAcquiredScreenComponent: Component {
                     title: environment.strings.Gift_Acquired_Recipient,
                     component: AnyComponent(Button(
                         content: AnyComponent(
-                            PeerCellComponent(
+                            PeerTableCellComponent(
                                 context: component.context,
                                 theme: environment.theme,
                                 strings: environment.strings,
@@ -455,14 +467,14 @@ private final class GiftAuctionAcquiredScreenComponent: Component {
             let closeButtonSize = self.closeButton.update(
                 transition: .immediate,
                 component: AnyComponent(GlassBarButtonComponent(
-                    size: CGSize(width: 40.0, height: 40.0),
-                    backgroundColor: environment.theme.rootController.navigationBar.glassBarButtonBackgroundColor,
+                    size: CGSize(width: 44.0, height: 44.0),
+                    backgroundColor: nil,
                     isDark: environment.theme.overallDarkAppearance,
-                    state: .generic,
+                    state: .glass,
                     component: AnyComponentWithIdentity(id: "close", component: AnyComponent(
                         BundleIconComponent(
                             name: "Navigation/Close",
-                            tintColor: environment.theme.rootController.navigationBar.glassBarButtonForegroundColor
+                            tintColor: environment.theme.chat.inputPanel.panelControlColor
                         )
                     )),
                     action: { [weak self] _ in
@@ -473,7 +485,7 @@ private final class GiftAuctionAcquiredScreenComponent: Component {
                     }
                 )),
                 environment: {},
-                containerSize: CGSize(width: 40.0, height: 40.0)
+                containerSize: CGSize(width: 44.0, height: 44.0)
             )
             let closeButtonFrame = CGRect(origin: CGPoint(x: rawSideInset + 16.0, y: 16.0), size: closeButtonSize)
             if let closeButtonView = self.closeButton.view {

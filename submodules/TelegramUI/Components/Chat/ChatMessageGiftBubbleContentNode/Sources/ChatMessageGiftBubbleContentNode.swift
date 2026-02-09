@@ -280,9 +280,9 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
         for media in item.message.media {
             if let action = media as? TelegramMediaAction {
                 switch action.action {
-                case let .starGift(gift, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _):
+                case let .starGift(gift, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _):
                     releasedBy = gift.releasedBy
-                case let .starGiftUnique(gift, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _):
+                case let .starGiftUnique(gift, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _):
                     releasedBy = gift.releasedBy
                 default:
                     break
@@ -430,6 +430,7 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
                 var buttonTitle = item.presentationData.strings.Notification_PremiumGift_View
                 var buttonIcon: String?
                 var ribbonTitle = ""
+                var customRibbonColors: [UIColor]?
                 var textSpacing: CGFloat = 0.0
                 var isStarGift = false
                 
@@ -454,7 +455,9 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
                         switch action.action {
                         case let .giftPremium(_, _, daysValue, _, _, giftText, giftEntities):
                             months = max(3, Int32(round(Float(daysValue) / 30.0)))
-                            if months == 12 {
+                            if daysValue < 30 {
+                                title = item.presentationData.strings.Notification_PremiumGift_DaysTitle(daysValue)
+                            } else if months == 12 {
                                 title = item.presentationData.strings.Notification_PremiumGift_YearsTitle(1)
                             } else {
                                 title = item.presentationData.strings.Notification_PremiumGift_MonthsTitle(months)
@@ -512,7 +515,8 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
                             title = item.presentationData.strings.Notification_StarsGiveaway_Title
                             let starsString = item.presentationData.strings.Notification_StarsGiveaway_Subtitle_Stars(Int32(clamping: count)).replacingOccurrences(of: " ", with: "\u{00A0}")
                             text = item.presentationData.strings.Notification_StarsGiveaway_Subtitle(peerName, starsString).string
-                        case let .giftCode(_, fromGiveaway, unclaimed, channelId, monthsValue, _, _, _, _, giftText, giftEntities):
+                        case let .giftCode(_, fromGiveaway, unclaimed, channelId, daysValue, _, _, _, _, giftText, giftEntities):
+                            let monthsValue = max(3, Int32(round(Float(daysValue) / 30.0)))
                             if channelId == nil {
                                 months = monthsValue
                                 if months == 12 {
@@ -554,7 +558,7 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
                                 buttonTitle = item.presentationData.strings.Notification_PremiumPrize_View
                                 hasServiceMessage = false
                             }
-                        case let .starGift(gift, convertStars, giftText, giftEntities, _, savedToProfile, converted, upgraded, canUpgrade, upgradeStars, isRefunded, isPrepaidUpgrade, _, channelPeerId, senderPeerId, _, _, _, _, _, toPeerId):
+                        case let .starGift(gift, convertStars, giftText, giftEntities, _, savedToProfile, converted, upgraded, canUpgrade, upgradeStars, isRefunded, isPrepaidUpgrade, _, channelPeerId, senderPeerId, _, _, _, _, _, toPeerId, _):
                             var incoming = incoming
                             var convertStars = convertStars
                             if case let .generic(gift) = gift {
@@ -577,7 +581,7 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
                                 
                                 let isChannelGift = item.message.id.peerId.namespace == Namespaces.Peer.CloudChannel || channelPeerId != nil
                                 if isSelfGift {
-                                    title = item.presentationData.strings.Notification_StarGift_Self_Title
+                                    title = item.presentationData.strings.Notification_StarGift_Purchased_Title
                                 } else {
                                     if isPrepaidUpgrade && senderPeerId == channelPeerId {
                                         title = item.presentationData.strings.Gift_View_Unknown_Title
@@ -686,7 +690,7 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
                                     }
                                 }
                             }
-                        case let .starGiftUnique(gift, isUpgrade, _, _, _, _, isRefunded, _, _, _, _, _, _, _, _, _):
+                        case let .starGiftUnique(gift, isUpgrade, _, _, _, _, isRefunded, _, _, _, _, _, _, _, _, _, fromOffer, _, isCrafted):
                             if case let .unique(uniqueGift) = gift {
                                 isStarGift = true
                                 
@@ -708,22 +712,40 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
                                 if isStoryEntity {
                                     title = uniqueGift.title
                                 } else if isSelfGift {
-                                    title = item.presentationData.strings.Notification_StarGift_Self_Title
+                                    if isCrafted {
+                                        title = item.presentationData.strings.Notification_StarGift_Crafted_Title
+                                    } else if isUpgrade {
+                                        title = item.presentationData.strings.Notification_StarGift_Upgraded_Title
+                                    } else {
+                                        title = item.presentationData.strings.Notification_StarGift_Purchased_Title
+                                    }
                                 } else if item.message.id.peerId.isTelegramNotifications {
                                     title = item.presentationData.strings.Notification_StarGift_TitleShort
                                 } else {
                                     title = item.presentationData.strings.Notification_StarGift_Title(authorName).string
                                 }    
                                 text = isStoryEntity ? "**\(item.presentationData.strings.Notification_StarGift_Collectible) #\(formatCollectibleNumber(uniqueGift.number, dateTimeFormat: item.presentationData.dateTimeFormat))**" : "**\(uniqueGift.title) #\(formatCollectibleNumber(uniqueGift.number, dateTimeFormat: item.presentationData.dateTimeFormat))**"
-                                ribbonTitle = isStoryEntity ? "" : item.presentationData.strings.Notification_StarGift_Gift
+                                if fromOffer {
+                                    ribbonTitle = incoming ? "" : item.presentationData.strings.Notification_StarGift_Sold
+                                    customRibbonColors = [UIColor(rgb: 0xd9433a), UIColor(rgb: 0xff645b)]
+                                } else {
+                                    ribbonTitle = isStoryEntity ? "" : item.presentationData.strings.Notification_StarGift_Gift
+                                }
+                                                                
                                 buttonTitle = isStoryEntity ? "" : item.presentationData.strings.Notification_StarGift_View
                                 modelTitle = item.presentationData.strings.Notification_StarGift_Model
                                 backdropTitle = item.presentationData.strings.Notification_StarGift_Backdrop
                                 symbolTitle = item.presentationData.strings.Notification_StarGift_Symbol
                                 
+                                if uniqueGift.flags.contains(.isBurned) {
+                                    ribbonTitle = item.presentationData.strings.Notification_StarGift_Burned
+                                    customRibbonColors = [UIColor(rgb: 0xd9433a), UIColor(rgb: 0xff645b)]
+                                    buttonTitle = ""
+                                }
+                                
                                 for attribute in uniqueGift.attributes {
                                     switch attribute {
-                                    case let .model(name, file, _):
+                                    case let .model(name, file, _, _):
                                         modelValue = name
                                         animationFile = file
                                     case let .backdrop(name, _, innerColor, outerColor, patternColor, _, _):
@@ -897,10 +919,10 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
                     }
                 ), textAlignment: .center)
                 
-                let (creatorButtonTitleLayout, creatorButtonTitleApply) = makeCreatorButtonTitleLayout(TextNodeLayoutArguments(attributedString: creatorButtonAttributedString, backgroundColor: nil, maximumNumberOfLines: 1, truncationType: .middle, constrainedSize: CGSize(width: giftSize.width - 32.0, height: CGFloat.greatestFiniteMagnitude), alignment: .center, cutout: nil, insets: UIEdgeInsets()))
+                let (creatorButtonTitleLayout, creatorButtonTitleApply) = makeCreatorButtonTitleLayout(TextNodeLayoutArguments(attributedString: creatorButtonAttributedString, backgroundColor: nil, maximumNumberOfLines: 2, truncationType: .middle, constrainedSize: CGSize(width: giftSize.width - 32.0, height: CGFloat.greatestFiniteMagnitude), alignment: .center, cutout: nil, insets: UIEdgeInsets()))
 
                 if modelTitle == nil && !creatorButtonTitle.isEmpty {
-                    textSpacing += 28.0
+                    textSpacing += creatorButtonTitleLayout.size.height + 13.0
                 }
                 
                 giftSize.height = titleLayout.size.height + textSpacing + clippedTextHeight + 164.0
@@ -909,7 +931,8 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
                     giftSize.height += 70.0
                     
                     if !creatorButtonTitle.isEmpty {
-                        giftSize.height += 28.0
+                        giftSize.height += creatorButtonTitleLayout.size.height + 13.0
+                        //28.0
                     }
                 }
                 
@@ -1073,7 +1096,7 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
                             
                             var attributesOffsetY: CGFloat = 0.0
                             
-                            let creatorButtonSize = CGSize(width: creatorButtonTitleLayout.size.width + 18.0, height: 18.0)
+                            let creatorButtonSize = CGSize(width: creatorButtonTitleLayout.size.width + 18.0, height: creatorButtonTitleLayout.size.height + 3.0)
                             let creatorButtonOriginY = modelTitle == nil ? titleFrame.maxY + 4.0 : clippingTextFrame.maxY + 5.0
                             let creatorButtonFrame = CGRect(origin: CGPoint(x: mediaBackgroundFrame.minX + floorToScreenPixels((mediaBackgroundFrame.width - creatorButtonSize.width) / 2.0), y: creatorButtonOriginY), size: creatorButtonSize)
                             if !creatorButtonTitle.isEmpty {
@@ -1284,7 +1307,9 @@ public class ChatMessageGiftBubbleContentNode: ChatMessageBubbleContentNode {
                             
                             if ribbonTextLayout.size.width > 0.0 {
                                 if strongSelf.ribbonBackgroundNode.image == nil {
-                                    if let uniqueBackgroundColor {
+                                    if let customRibbonColors {
+                                        strongSelf.ribbonBackgroundNode.image = generateGradientTintedImage(image: UIImage(bundleImageName: "Premium/GiftRibbon"), colors: customRibbonColors, direction: .mirroredDiagonal)
+                                    } else if let uniqueBackgroundColor {
                                         let colors = [
                                             uniqueBackgroundColor.withMultiplied(hue: 0.97, saturation: 1.45, brightness: 0.89),
                                             uniqueBackgroundColor.withMultiplied(hue: 1.01, saturation: 1.22, brightness: 1.04)

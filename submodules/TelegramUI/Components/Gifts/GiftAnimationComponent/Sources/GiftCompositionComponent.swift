@@ -18,8 +18,12 @@ import UIKitRuntimeUtils
 public final class GiftCompositionComponent: Component {
     public class ExternalState {
         public fileprivate(set) var previewPatternColor: UIColor?
+        public fileprivate(set) var backgroundColor: UIColor?
+        public fileprivate(set) var previewModel: StarGift.UniqueGift.Attribute?
+        public fileprivate(set) var previewBackdrop: StarGift.UniqueGift.Attribute?
+        public fileprivate(set) var previewSymbol: StarGift.UniqueGift.Attribute?
+        
         public init() {
-            self.previewPatternColor = nil
         }
     }
     
@@ -35,6 +39,8 @@ public final class GiftCompositionComponent: Component {
     let animationOffset: CGPoint?
     let animationScale: CGFloat?
     let displayAnimationStars: Bool
+    let animateScaleOnTransition: Bool
+    let alwaysAnimateTransition: Bool
     let revealedAttributes: Set<StarGift.UniqueGift.Attribute.AttributeType>
     let externalState: ExternalState?
     let requestUpdate: (ComponentTransition) -> Void
@@ -46,6 +52,8 @@ public final class GiftCompositionComponent: Component {
         animationOffset: CGPoint? = nil,
         animationScale: CGFloat? = nil,
         displayAnimationStars: Bool = false,
+        animateScaleOnTransition: Bool = true,
+        alwaysAnimateTransition: Bool = false,
         revealedAttributes: Set<StarGift.UniqueGift.Attribute.AttributeType> = Set(),
         externalState: ExternalState? = nil,
         requestUpdate: @escaping (ComponentTransition) -> Void = { _ in }
@@ -56,6 +64,8 @@ public final class GiftCompositionComponent: Component {
         self.animationOffset = animationOffset
         self.animationScale = animationScale
         self.displayAnimationStars = displayAnimationStars
+        self.animateScaleOnTransition = animateScaleOnTransition
+        self.alwaysAnimateTransition = alwaysAnimateTransition
         self.revealedAttributes = revealedAttributes
         self.externalState = externalState
         self.requestUpdate = requestUpdate
@@ -78,6 +88,9 @@ public final class GiftCompositionComponent: Component {
             return false
         }
         if lhs.displayAnimationStars != rhs.displayAnimationStars {
+            return false
+        }
+        if lhs.animateScaleOnTransition != rhs.animateScaleOnTransition {
             return false
         }
         if lhs.revealedAttributes != rhs.revealedAttributes {
@@ -207,7 +220,7 @@ public final class GiftCompositionComponent: Component {
             _ attribute: StarGift.UniqueGift.Attribute,
             animDuration: Double
         ) {
-            guard let geom = self.spinGeom, case let .model(_, file, _) = attribute else {
+            guard let geom = self.spinGeom, case let .model(_, file, _, _) = attribute else {
                 return
             }
 
@@ -328,7 +341,7 @@ public final class GiftCompositionComponent: Component {
             self.decelItemHosts.removeAll()
             
             for (i, attribute) in tail.reversed().enumerated() {
-                guard case let .model(_, file, _) = attribute else { continue }
+                guard case let .model(_, file, _, _) = attribute else { continue }
 
                 let node = DefaultAnimatedStickerNodeImpl()
                 node.isUserInteractionEnabled = false
@@ -636,7 +649,7 @@ public final class GiftCompositionComponent: Component {
 
                 for attribute in gift.attributes {
                     switch attribute {
-                    case let .model(_, file, _):
+                    case let .model(_, file, _, _):
                         animationFile = file
                         if !self.fetchedFiles.contains(file.fileId.id) {
                             self.disposables.add(freeMediaFileResourceInteractiveFetched(account: component.context.account, userLocation: .other, fileReference: .standalone(media: file), resource: file.resource).start())
@@ -671,24 +684,29 @@ public final class GiftCompositionComponent: Component {
                 loop = true
                 self.stopSpinIfNeeded()
                 
-                if self.previewModels.isEmpty {
+                if self.previewModels.isEmpty || sampleAttributes.count == 3 {
                     var models: [StarGift.UniqueGift.Attribute] = []
                     var patterns: [StarGift.UniqueGift.Attribute] = []
                     var backdrops: [StarGift.UniqueGift.Attribute] = []
                     for attribute in sampleAttributes {
                         switch attribute {
-                        case .model:   models.append(attribute)
+                        case .model: models.append(attribute)
                         case .pattern: patterns.append(attribute)
                         case .backdrop: backdrops.append(attribute)
                         default: break
                         }
                     }
+                    
+                    if self.previewModels != models && sampleAttributes.count == 3 {
+                        self.animatePreviewTransition = true
+                    }
+                    
                     self.previewModels = models
                     self.previewPatterns = patterns
                     self.previewBackdrops = backdrops
                 }
                 
-                for case let .model(_, file, _) in self.previewModels where !self.fetchedFiles.contains(file.fileId.id) {
+                for case let .model(_, file, _, _) in self.previewModels where !self.fetchedFiles.contains(file.fileId.id) {
                     self.disposables.add(freeMediaFileResourceInteractiveFetched(account: component.context.account, userLocation: .other, fileReference: .standalone(media: file), resource: file.resource).start())
                     self.fetchedFiles.insert(file.fileId.id)
                 }
@@ -705,21 +723,24 @@ public final class GiftCompositionComponent: Component {
                     if self.previewBackdropIndex < 0 {
                         self.previewBackdropIndex = 0
                     }
-                    if case let .model(_, file, _) = self.previewModels[Int(self.previewModelIndex)] {
+                    if case let .model(_, file, _, _) = self.previewModels[Int(self.previewModelIndex)] {
                         animationFile = file
+                        component.externalState?.previewModel = self.previewModels[Int(self.previewModelIndex)]
                     }
-                    if case let .pattern(_, file, _) = self.previewPatterns[Int(self.previewPatternIndex)] {
+                    if !self.previewPatterns.isEmpty, case let .pattern(_, file, _) = self.previewPatterns[Int(self.previewPatternIndex)] {
                         patternFile = file
                         files[file.fileId.id] = file
+                        component.externalState?.previewSymbol = self.previewPatterns[Int(self.previewPatternIndex)]
                     }
-                    if case let .backdrop(_, _, innerColorValue, outerColorValue, patternColorValue, _, _) = self.previewBackdrops[Int(self.previewBackdropIndex)] {
+                    if !self.previewBackdrops.isEmpty, case let .backdrop(_, _, innerColorValue, outerColorValue, patternColorValue, _, _) = self.previewBackdrops[Int(self.previewBackdropIndex)] {
                         backgroundColor = UIColor(rgb: UInt32(bitPattern: outerColorValue))
                         secondBackgroundColor = UIColor(rgb: UInt32(bitPattern: innerColorValue))
                         patternColor = UIColor(rgb: UInt32(bitPattern: patternColorValue))
+                        component.externalState?.previewBackdrop = self.previewBackdrops[Int(self.previewBackdropIndex)]
                     }
                 }
                 
-                if self.previewTimer == nil {
+                if self.previewTimer == nil && sampleAttributes.count > 3 {
                     self.previewTimer = SwiftSignalKit.Timer(timeout: 2.0, repeat: true, completion: { [weak self] in
                         guard let self, !self.previewModels.isEmpty else { return }
                         self.previewModelIndex = (self.previewModelIndex + 1) % Int32(self.previewModels.count)
@@ -746,6 +767,7 @@ public final class GiftCompositionComponent: Component {
                 }
             }
             
+            component.externalState?.backgroundColor = backgroundColor
             component.externalState?.previewPatternColor = secondBackgroundColor
             
             var animateBackdropSwipe = false
@@ -755,7 +777,9 @@ public final class GiftCompositionComponent: Component {
             }
             
             var animateTransition = false
-            if self.animatePreviewTransition {
+            if component.alwaysAnimateTransition {
+                animateTransition = true
+            } else if self.animatePreviewTransition {
                 animateTransition = true
                 self.animatePreviewTransition = false
             } else if let previousComponent, case .preview = previousComponent.subject, case .unique = component.subject {
@@ -775,6 +799,9 @@ public final class GiftCompositionComponent: Component {
                         if case .unique = component.subject {
                             bounce = self.previewPatternIndex == -1
                             background = false
+                        }
+                        if !component.animateScaleOnTransition {
+                            bounce = false
                         }
                         backgroundView.animateTransition(background: background, bounce: bounce)
                     }
@@ -826,12 +853,12 @@ public final class GiftCompositionComponent: Component {
             if let (previewAttributes, mainGift) = uniqueSpinContext {
                 var mainModelFile: TelegramMediaFile?
                 for attribute in mainGift.attributes {
-                    if case let .model(_, file, _) = attribute { mainModelFile = file; break }
+                    if case let .model(_, file, _, _) = attribute { mainModelFile = file; break }
                 }
 
                 var models: [StarGift.UniqueGift.Attribute] = []
                 for attribute in previewAttributes {
-                    if case let .model(_, file, _) = attribute,
+                    if case let .model(_, file, _, _) = attribute,
                        file.fileId.id != mainModelFile?.fileId.id {
                         models.append(attribute)
                     }
@@ -841,7 +868,7 @@ public final class GiftCompositionComponent: Component {
                     return availableSize
                 }
 
-                for case let .model(_, file, _) in models where !self.fetchedFiles.contains(file.fileId.id) {
+                for case let .model(_, file, _, _) in models where !self.fetchedFiles.contains(file.fileId.id) {
                     self.disposables.add(freeMediaFileResourceInteractiveFetched(
                         account: component.context.account,
                         userLocation: .other,
@@ -887,7 +914,7 @@ public final class GiftCompositionComponent: Component {
                 } else if !nowAnimating && wasAnimating {
                     var tail = Array(models.shuffled().prefix(6))
                     if let mainModelFile {
-                        tail.append(.model(name: "", file: mainModelFile, rarity: 0))
+                        tail.append(.model(name: "", file: mainModelFile, rarity: .rare, crafted: false))
                     }
                     self.beginDecelerationWithQueue(
                         tail: tail,

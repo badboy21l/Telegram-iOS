@@ -155,7 +155,7 @@ public final class PremiumGradientBackgroundComponent: Component {
     }
 }
 
-final class DemoPageEnvironment: Equatable {
+public final class DemoPageEnvironment: Equatable {
     public let isDisplaying: Bool
     public let isCentral: Bool
     public let position: CGFloat
@@ -1133,21 +1133,21 @@ private final class DemoSheetContent: CombinedComponent {
             
             let closeButton = closeButton.update(
                 component: GlassBarButtonComponent(
-                    size: CGSize(width: 40.0, height: 40.0),
-                    backgroundColor: theme.rootController.navigationBar.glassBarButtonBackgroundColor,
-                    isDark: theme.overallDarkAppearance,
-                    state: .glass,
+                    size: CGSize(width: 44.0, height: 44.0),
+                    backgroundColor: UIColor(rgb: 0x7f76f4),
+                    isDark: false,
+                    state: .tintedGlass,
                     component: AnyComponentWithIdentity(id: "close", component: AnyComponent(
                         BundleIconComponent(
                             name: "Navigation/Close",
-                            tintColor: theme.rootController.navigationBar.glassBarButtonForegroundColor
+                            tintColor: .white
                         )
                     )),
                     action: { _ in
                         component.dismiss()
                     }
                 ),
-                availableSize: CGSize(width: 40.0, height: 40.0),
+                availableSize: CGSize(width: 44.0, height: 44.0),
                 transition: .immediate
             )
             context.add(closeButton
@@ -1413,6 +1413,8 @@ private final class DemoSheetComponent: CombinedComponent {
                 environment: {
                     environment
                     SheetComponentEnvironment(
+                        metrics: environment.metrics,
+                        deviceMetrics: environment.deviceMetrics,
                         isDisplaying: environment.value.isVisible,
                         isCentered: environment.metrics.widthClass == .regular,
                         hasInputHeight: !environment.inputHeight.isZero,

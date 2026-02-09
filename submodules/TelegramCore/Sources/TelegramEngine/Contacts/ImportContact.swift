@@ -10,10 +10,10 @@ func _internal_importContact(account: Account, firstName: String, lastName: Stri
     var note: Api.TextWithEntities?
     if !noteText.isEmpty {
         flags |= (1 << 1)
-        note = .textWithEntities(text: noteText, entities: apiEntitiesFromMessageTextEntities(noteEntities, associatedPeers: SimpleDictionary()))
+        note = .textWithEntities(.init(text: noteText, entities: apiEntitiesFromMessageTextEntities(noteEntities, associatedPeers: SimpleDictionary())))
     }
     
-    let input = Api.InputContact.inputPhoneContact(flags: 0, clientId: 1, phone: phoneNumber, firstName: firstName, lastName: lastName, note: note)
+    let input = Api.InputContact.inputPhoneContact(.init(flags: 0, clientId: 1, phone: phoneNumber, firstName: firstName, lastName: lastName, note: note))
     
     return account.network.request(Api.functions.contacts.importContacts(contacts: [input]))
     |> map(Optional.init)
@@ -24,7 +24,8 @@ func _internal_importContact(account: Account, firstName: String, lastName: Stri
         return account.postbox.transaction { transaction -> PeerId? in
             if let result = result {
                 switch result {
-                    case let .importedContacts(_, _, _, users):
+                    case let .importedContacts(importedContactsData):
+                        let users = importedContactsData.users
                         if let first = users.first {
                             updatePeers(transaction: transaction, accountPeerId: accountPeerId, peers: AccumulatedPeers(users: users))
                             
@@ -36,7 +37,7 @@ func _internal_importContact(account: Account, firstName: String, lastName: Stri
                                 transaction.replaceContactPeerIds(peerIds)
                             }
                             if !noteText.isEmpty {
-                                transaction.updatePeerCachedData(peerIds: peerIds, update: { peerId, cachedData in
+                                transaction.updatePeerCachedData(peerIds: [peerId], update: { peerId, cachedData in
                                     (cachedData as? CachedUserData)?.withUpdatedNote(.init(text: noteText, entities: noteEntities))
                                 })
                             }
@@ -75,7 +76,7 @@ func _internal_addContactInteractively(account: Account, peerId: PeerId, firstNa
         var note: Api.TextWithEntities?
         if !noteText.isEmpty {
             flags |= (1 << 1)
-            note = .textWithEntities(text: noteText, entities: apiEntitiesFromMessageTextEntities(noteEntities, associatedPeers: SimpleDictionary()))
+            note = .textWithEntities(.init(text: noteText, entities: apiEntitiesFromMessageTextEntities(noteEntities, associatedPeers: SimpleDictionary())))
         }
         return account.network.request(Api.functions.contacts.addContact(flags: flags, id: inputUser, firstName: firstName, lastName: lastName, phone: phone, note: note))
         |> mapError { _ -> AddContactError in
@@ -85,9 +86,11 @@ func _internal_addContactInteractively(account: Account, peerId: PeerId, firstNa
             return account.postbox.transaction { transaction -> Void in
                 var peers = AccumulatedPeers()
                 switch result {
-                case let .updates(_, users, _, _, _):
+                case let .updates(updatesData):
+                    let users = updatesData.users
                     peers = AccumulatedPeers(users: users)
-                case let .updatesCombined(_, users, _, _, _, _):
+                case let .updatesCombined(updatesCombinedData):
+                    let users = updatesCombinedData.users
                     peers = AccumulatedPeers(users: users)
                 default:
                     break
@@ -99,7 +102,7 @@ func _internal_addContactInteractively(account: Account, peerId: PeerId, firstNa
                     transaction.replaceContactPeerIds(peerIds)
                 }
                 if !noteText.isEmpty {
-                    transaction.updatePeerCachedData(peerIds: peerIds, update: { peerId, cachedData in
+                    transaction.updatePeerCachedData(peerIds: [peerId], update: { peerId, cachedData in
                         (cachedData as? CachedUserData)?.withUpdatedNote(.init(text: noteText, entities: noteEntities))
                     })
                 }

@@ -10,6 +10,11 @@ import AccountContext
 import TelegramPresentationData
 
 public final class TabSelectorComponent: Component {
+    public enum Style {
+        case glass
+        case legacy
+    }
+    
     public final class TransitionHint {
         public let scrollToEnd: Bool
         
@@ -60,8 +65,9 @@ public final class TabSelectorComponent: Component {
         public var lineSelection: Bool
         public var verticalInset: CGFloat
         public var allowScroll: Bool
+        public var height: CGFloat?
         
-        public init(font: UIFont, spacing: CGFloat = 2.0, innerSpacing: CGFloat? = nil, fillWidth: Bool = false, lineSelection: Bool = false, verticalInset: CGFloat = 0.0, allowScroll: Bool = true) {
+        public init(font: UIFont, spacing: CGFloat = 2.0, innerSpacing: CGFloat? = nil, fillWidth: Bool = false, lineSelection: Bool = false, verticalInset: CGFloat = 0.0, allowScroll: Bool = true, height: CGFloat? = nil) {
             self.font = font
             self.spacing = spacing
             self.innerSpacing = innerSpacing
@@ -69,6 +75,7 @@ public final class TabSelectorComponent: Component {
             self.lineSelection = lineSelection
             self.verticalInset = verticalInset
             self.allowScroll = allowScroll
+            self.height = height
         }
     }
     
@@ -124,6 +131,7 @@ public final class TabSelectorComponent: Component {
     public let context: AccountContext?
     public let colors: Colors
     public let theme: PresentationTheme
+    public let style: Style
     public let customLayout: CustomLayout?
     public let items: [Item]
     public let selectedId: AnyHashable?
@@ -135,6 +143,7 @@ public final class TabSelectorComponent: Component {
         context: AccountContext? = nil,
         colors: Colors,
         theme: PresentationTheme,
+        style: Style = .legacy,
         customLayout: CustomLayout? = nil,
         items: [Item],
         selectedId: AnyHashable?,
@@ -145,6 +154,7 @@ public final class TabSelectorComponent: Component {
         self.context = context
         self.colors = colors
         self.theme = theme
+        self.style = style
         self.customLayout = customLayout
         self.items = items
         self.selectedId = selectedId
@@ -161,6 +171,9 @@ public final class TabSelectorComponent: Component {
             return false
         }
         if lhs.theme !== rhs.theme {
+            return false
+        }
+        if lhs.style != rhs.style {
             return false
         }
         if lhs.customLayout != rhs.customLayout {
@@ -519,7 +532,17 @@ public final class TabSelectorComponent: Component {
             
             self.reorderRecognizer?.isEnabled = component.reorderItem != nil
             
-            let baseHeight: CGFloat = 28.0
+            let baseHeight: CGFloat
+            if let customLayout = component.customLayout, let height = customLayout.height {
+                baseHeight = height
+            } else {
+                switch component.style {
+                case .glass:
+                    baseHeight = 32.0
+                case .legacy:
+                    baseHeight = 28.0
+                }
+            }
             
             var verticalInset: CGFloat = 0.0
             if let customLayout = component.customLayout {
@@ -614,7 +637,7 @@ public final class TabSelectorComponent: Component {
                 if case .component = item.content {
                     useSelectionFraction = true
                 }
-                if let _ = component.colors.normal {
+                if let normal = component.colors.normal, normal != component.colors.foreground {
                     useSelectionFraction = true
                 }
                 
